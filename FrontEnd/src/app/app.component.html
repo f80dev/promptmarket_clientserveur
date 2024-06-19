@@ -1,0 +1,12 @@
+<div class="mainform background-form" style="padding: 10px;text-align: center;">
+
+  <div style="width:500px;display: inline-block">
+    <app-input label="prompt" (valueChange)="text=$event" [value]="text"></app-input><br>
+    <app-input label="inference" value_type="number" (valueChange)="inference=$event" [value]="inference"></app-input><br>
+    <app-input label="dimension" value_type="list" options="128,256,512,1024" (valueChange)="scale=$event" [value]="scale"></app-input><br>
+
+  </div>
+
+  <br>
+  <button mat-raised-button (click)="send_prompt()">Envoyer</button>
+</div>
