@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Creator/Creator.iml" filepath="$PROJECT_DIR$/Creator/Creator.iml" />
+      <module fileurl="file://$PROJECT_DIR$/FrontEnd.iml" filepath="$PROJECT_DIR$/FrontEnd.iml" />
+      <module fileurl="file://$PROJECT_DIR$/promptmarket.iml" filepath="$PROJECT_DIR$/promptmarket.iml" />
+    </modules>
+  </component>
+</project>

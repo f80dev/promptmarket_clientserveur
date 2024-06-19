@@ -1,0 +1,5 @@
+cryptography
+Flask
+multiversx-sdk-core
+multiversx-sdk-wallet
+multiversx_sdk_network_providers
