@@ -1,4 +1,9 @@
+from multiversx_sdk.abi import StringValue, U8Value, U32Value, U64Value
+
 from Network import Network
+
+
+
 
 
 class PromptMarket:
@@ -9,17 +14,23 @@ class PromptMarket:
         self.contract_addr=contract_addr
 
 
-    def prompt_list(self):
-        result=self.network.query(self.contract_addr,"prompts")
-        return result
+    def prompt_list(self,model=-1) -> list:
+        rc=list()
+        results=self.network.query(self.contract_addr,"prompts")
+        for r in results[0]:
+            if model==-1 or r.model==model:
+                rc.append(r.__dict__)
+
+        return rc
+
 
     def add_render(self, creator:str,prompt_id:int, url:str, price:float):
-
+        #voir https://docs.multiversx.com/sdk-and-tools/sdk-py/sdk-py-cookbook#perform-a-contract-deployment pour le typage des arguments
         data=[
             self.network.address_from(creator,format="address"),
-            U32Value(prompt_id),
+            prompt_id,
             url,
-            price
+            int(price*1e18)
         ]
         _t=self.network.create_transaction(self.network.address_from(creator,format="erd"),data,contract=self.contract_addr,function="add_render")
         rc=self.network.send_transaction(_t,self.network.signer_from(creator))

@@ -4,6 +4,7 @@ class Network():
     network_name=""
     network_type=""
     keys=[]
+    abi=""
 
     def __init__(self,network:str):
         self.network=network
@@ -11,7 +12,7 @@ class Network():
         self.network_name=network.split("-")[0]
         self.network_type=network.split("-")[1]
 
-    def create_transaction(self,miner_addr:str,data:str or list,value:float=0.0,receiver=None,contract=None,function="",token="egld"):
+    def create_transaction(self,miner_addr:str,data:str or list,value:float=0.0,receiver=None,contract=None,function="",token="egld",abi=""):
         pass
 
     def query(self,contract:str,method:str,params:[any]=[],caller:str=None):

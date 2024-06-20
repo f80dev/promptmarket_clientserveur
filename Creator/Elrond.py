@@ -5,15 +5,16 @@ import random
 from pathlib import Path
 from time import sleep
 
-from multiversx_sdk_core import TokenTransfer, Token, Address, TokenComputer, Transaction, ContractQueryBuilder, \
-    TransactionComputer
-from multiversx_sdk_core.transaction_factories import TransactionsFactoryConfig, SmartContractTransactionsFactory
+from multiversx_sdk import QueryRunnerAdapter, SmartContractQueriesController, SmartContractTransactionsFactory, \
+    TransactionsFactoryConfig, TransactionsConverter, SmartContractTransactionsOutcomeParser, ApiNetworkProvider
+from multiversx_sdk_core import TokenTransfer, Token, Address, Transaction, TransactionComputer
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from multiversx_sdk_wallet import UserSigner, UserSecretKey
+from multiversx_sdk.abi import Abi
 
 from Network import Network
 
-LIMIT_GAS=600000000
+LIMIT_GAS=500000000
 
 NETWORKS={
     "localnet":{
@@ -90,9 +91,10 @@ def now(format="dec"):
 
 
 class Elrond(Network):
-    def __init__(self,network="elrond-devnet"):
+    def __init__(self,network="elrond-devnet",abi_path=""):
         super().__init__(network)
-        self._proxy=ProxyNetworkProvider(NETWORKS[self.network_type]["proxy"])
+        self._proxy=ApiNetworkProvider(NETWORKS[self.network_type]["proxy"])
+        self.abi=Abi.load(Path(abi_path))
 
     def query(self,contract:str,method:str,params:[any]=[],caller:str=None):
         """
@@ -103,20 +105,26 @@ class Elrond(Network):
         :param caller:
         :return:
         """
-
+        #voir https://docs.multiversx.com/sdk-and-tools/sdk-py/sdk-py-cookbook/#contract-queries
         if type(params)!=list:params=[params]
+        query_runner = QueryRunnerAdapter(self._proxy)
+        query_controller = SmartContractQueriesController(query_runner, self.abi)
 
-        builder = ContractQueryBuilder(
-            contract=Address.from_bech32(contract),
+        assert contract.startswith("erd")
+
+        query  = query_controller.create_query(
+            contract=contract,
             function=method,
-            call_arguments=params,
+            arguments=params,
             caller=Address.from_bech32(caller) if caller else None
         )
 
-        response=self._proxy.query_contract(builder.build())
+        #voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13/#contract-queries
+        response=query_controller.run_query(query)
         if response.return_code!="ok":
             return None
-        return response.return_data
+
+        return query_controller.parse_query_response(response)
 
 
     def signer_from(self,sign:str,password="") -> UserSigner:
@@ -195,7 +203,7 @@ class Elrond(Network):
                     t=self._proxy.get_transaction(hash)
 
                     if t.status.status=="success":break
-                    if t.status.status=="invalid":
+                    if t.status.status=="invalid" or t.status.status=="fail":
                         break
 
                 d=t.to_dictionary()
@@ -204,22 +212,16 @@ class Elrond(Network):
                 r = self._proxy.simulate_transaction(transaction)
                 hash=r.raw["result"]["hash"]
 
+            #voir https://docs.multiversx.com/sdk-and-tools/sdk-py/sdk-py-cookbook/#parsing-transaction-outcome
+            converter = TransactionsConverter()
+            parser = SmartContractTransactionsOutcomeParser()
+            transaction_outcome = converter.transaction_on_network_to_outcome(t)
+            parsed_outcome = parser.parse_deploy(transaction_outcome)
+
             d["explorer"]=self.getExplorer(hash)
             d["error"]=d["status"] if not d["status"]=="success" else ""
             d["results"]=dict()
-            fields_to_translate=["issue","signalError","issueNonFungible","issueSemiFungible","upgradeProperties"]
-            results=dict()
-
-            for e in t.raw_response["logs"]["events"]:
-                if "data" in e:
-                    results[e["identifier"]]=str(base64.b64decode(e["data"]),"utf8")
-
-            if "smartContractResults" in d:
-                for e in d["smartContractResults"]:
-                    k=e["data"].split("@")[0]
-                    results[k]=e["data"].replace(k+"@","").split("@")
-
-            d["results"]=results
+            d["results"]=parsed_outcome["contracts"]
             return d
 
         except Exception as inst:
@@ -235,7 +237,7 @@ class Elrond(Network):
 
 
 
-    def create_transaction(self,miner_addr:str,data:str or list,value:float=0.0,receiver=None,contract=None,function="",token="egld") -> Transaction:
+    def create_transaction(self,miner_addr:str,data:str or list,value:float=0.0,receiver=None,contract=None,function="",token="egld",abi="") -> Transaction:
         """
 
         :param _miner:
@@ -245,7 +247,7 @@ class Elrond(Network):
         voir https://docs.multiversx.com/sdk-and-tools/sdk-py/sdk-py-cookbook/#contract-deployments-and-interactions
         """
         config = TransactionsFactoryConfig(chain_id=self._proxy.get_network_config().chain_id)
-        sc_factory = SmartContractTransactionsFactory(config, TokenComputer())
+        sc_factory = SmartContractTransactionsFactory(config,self.abi)
 
         if type(contract)==str: contract=Address.from_bech32(contract)
         if token!="egld":           #voir https://docs.multiversx.com/sdk-and-tools/sdk-py/sdk-py-cookbook/#contract-deployments-and-interactions=

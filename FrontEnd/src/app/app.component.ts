@@ -2,7 +2,7 @@ import {Component} from '@angular/core';
 import { ExtensionProvider } from "@multiversx/sdk-extension-provider";
 
 import {
-  Address,
+  Address, BigUIntValue,
   SmartContractTransactionsFactory, SmartContractTransactionsOutcomeParser, StringValue, Token,
   TokenTransfer, Transaction, TransactionComputer, TransactionsConverter,
   TransactionsFactoryConfig, TransactionWatcher, U16Value, U8Value
@@ -16,12 +16,16 @@ import {WalletProvider} from "@multiversx/sdk-web-wallet-provider/out";
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent {
+export class AppComponent extends ApiNetworkProvider {
   title = 'FrontEnd';
   text="un lapin sur une plage"
-  inference=50
-  scale=128
+  inference=30
+  scale=256
   //api=inject(NetworkService);
+
+  constructor() {
+    super("https://devnet-api.multiversx.com");
+  }
 
   async send_prompt() {
     //voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13#formatting-and-parsing-amounts
@@ -33,11 +37,10 @@ export class AppComponent {
     //voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13#signing-objects
     const provider = ExtensionProvider.getInstance();
     await provider.init()
+    await provider.login()
 
-    let sender=await provider.login()
-
-    //let sender=await provider
-
+    let sender=Address.fromBech32(await provider.getAddress());
+    let _sender=await this.getAccount(sender)
 
     // const pemText = await promises.readFile("../wallet/user1.pem", { encoding: "utf8" });
     // let signer = UserSigner.fromPem(pemText);
@@ -50,16 +53,16 @@ export class AppComponent {
     let token_transfer=new TokenTransfer(
       {
         token: new Token({identifier: "AIRDROP-bc8a67"}),
-        amount: 10000000000000000000n
+        amount: 4000000000000000000n
       }
     )
 
     //voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13#transfer--execute
     const transaction = factory.createTransactionForExecute({
-      sender: Address.fromBech32(sender),
-      contract: Address.fromBech32("erd1qqqqqqqqqqqqqpgqfddzvxw6f0fkrlra4puhzwcd623g3njw835sk536cy"),
+      sender: sender,
+      contract: Address.fromBech32("erd1qqqqqqqqqqqqqpgq92twlq9u6ke8zd50jlq5gjrrv7q00nrl835sxrz8p4"),
       function: "add_prompt",
-      gasLimit: 5000000n,
+      gasLimit: 500000000n,
       nativeTransferAmount:0n,
       arguments: args,
       tokenTransfers:[token_transfer]
@@ -67,14 +70,23 @@ export class AppComponent {
 
     //voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-signing-providers/#signing-transactions-1
     //voir exemple https://github.com/multiversx/mx-sdk-js-examples/blob/0d35714c9172ea5a31a7563a155a942b9249782e/signing-providers/src/extension.js#L52
-    transaction.nonce=42n
-    await provider.signTransaction(transaction)
+    transaction.nonce=BigInt(_sender.nonce)
+    let sign_transaction=await provider.signTransaction(transaction)
 
     //voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13#creating-network-providers
-    const proxyNetworkProvider = new ProxyNetworkProvider("https://devnet-gateway.multiversx.com");
+    //const proxyNetworkProvider = new ProxyNetworkProvider("https://devnet-gateway.multiversx.com");
+
+
 
     //Voir https://docs.multiversx.com/sdk-and-tools/sdk-js/sdk-js-cookbook-v13#broadcast-using-a-network-provider
-    const txHash = await proxyNetworkProvider.sendTransaction(transaction);
+    //const txHash = await proxyNetworkProvider.sendTransaction(transaction);
+    try{
+      let rc=await this.sendTransaction(sign_transaction)
+    }catch (e) {
+      console.log(e)
+      debugger
+    }
+
 
     //Attente du résultat
     //const watcherUsingApi = new TransactionWatcher(apiNetworkProvider);
@@ -85,6 +97,5 @@ export class AppComponent {
     //
     // const transactionOutcome = converter.transactionOnNetworkToOutcome(transactionOnNetworkUsingProxy);
     // const parsedOutcome = parser.parseDeploy({ transactionOutcome });
-    debugger
   }
 }
